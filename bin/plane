@@ -1,21 +1,198 @@
 #!/usr/bin/env bash
-# Summary: Plane.so REST CLI dispatcher (placeholder — replaced in Unit 4).
-# Usage: plane <resource> <action> [flags]
+# Summary: Plane.so REST CLI dispatcher — routes `plane <resource> <action>` or
+# `plane <meta>`. Help is lazy (greps lib/*.sh for # Summary:); resource libs
+# are only sourced when their action actually runs.
+#
+# Unit 4: dispatcher + meta commands (doctor, version, resolve) + lazy help.
+# Resource actions hit Unit 4 stubs that print a "not implemented" note until
+# Unit 6 fills each lib in.
 set -u
 
-PLANE_VERSION="0.0.0-unit1-placeholder"
+# ---- Resolve install root + lib dir ----
+# This script may be invoked via symlink (install.sh --symlink). Follow the
+# symlink chain so we source from the source repo, not from $HOME/.claude/....
+_plane_resolve_self() {
+  local src="$1"
+  # macOS bash 3.2 has no readlink -f; follow manually.
+  while [ -L "$src" ]; do
+    local dir target
+    dir=$(cd -P "$(dirname "$src")" && pwd)
+    target=$(readlink "$src")
+    case "$target" in
+      /*) src="$target" ;;
+      *)  src="$dir/$target" ;;
+    esac
+  done
+  (cd -P "$(dirname "$src")" && pwd)
+}
 
-case "${1:-}" in
-  -v|--version|version)
-    printf 'plane %s\n' "$PLANE_VERSION"
+_PLANE_BIN_DIR=$(_plane_resolve_self "${BASH_SOURCE[0]}")
+_PLANE_ROOT=$(cd -P "$_PLANE_BIN_DIR/.." && pwd)
+export PLANE_LIB_DIR="${PLANE_LIB_DIR:-$_PLANE_ROOT/lib}"
+
+# ---- Bash 4 gate ----
+if [ -z "${BASH_VERSINFO+x}" ] || [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
+  printf 'plane: bash >= 4 required (have %s)\n' "${BASH_VERSION:-unknown}" >&2
+  printf 'plane: on macOS, install with: brew install bash\n' >&2
+  exit 3
+fi
+
+# ---- Source shared infra (not resource libs) ----
+# shellcheck source=../lib/_parse.sh
+. "$PLANE_LIB_DIR/_parse.sh"
+# shellcheck source=../lib/_core.sh
+. "$PLANE_LIB_DIR/_core.sh"
+# shellcheck source=../lib/_endpoint_map.sh
+. "$PLANE_LIB_DIR/_endpoint_map.sh"
+# shellcheck source=../lib/_help.sh
+. "$PLANE_LIB_DIR/_help.sh"
+
+# ---- Global flag parsing ----
+# Consume global flags up front; leave remainder in POS for subcommand dispatch.
+POS=()
+FLAG_WORKSPACE=""
+FLAG_API_URL=""
+FLAG_JSON=0
+FLAG_PRETTY=0
+FLAG_NO_COLOR=0
+FLAG_FOLLOW=0
+FLAG_CONNECT_TIMEOUT=""
+FLAG_MAX_TIME=""
+FLAG_HELP=0
+FLAG_VERSION=0
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --workspace)        FLAG_WORKSPACE="$2"; shift 2 ;;
+    --workspace=*)      FLAG_WORKSPACE="${1#*=}"; shift ;;
+    --api-url)          FLAG_API_URL="$2"; shift 2 ;;
+    --api-url=*)        FLAG_API_URL="${1#*=}"; shift ;;
+    --json)             FLAG_JSON=1; shift ;;
+    --pretty)           FLAG_PRETTY=1; shift ;;
+    --no-color)         FLAG_NO_COLOR=1; shift ;;
+    --follow-redirects) FLAG_FOLLOW=1; shift ;;
+    --connect-timeout)  FLAG_CONNECT_TIMEOUT="$2"; shift 2 ;;
+    --max-time)         FLAG_MAX_TIME="$2"; shift 2 ;;
+    -h|--help)          FLAG_HELP=1; shift ;;
+    -v|--version)       FLAG_VERSION=1; shift ;;
+    --)                 shift; POS+=("$@"); break ;;
+    -*)
+      # Unknown global flag — but it may be a subcommand flag. Only reject if
+      # no positional has been collected yet and it doesn't match a known form.
+      if [ "${#POS[@]}" -eq 0 ]; then
+        printf 'plane: unknown global flag: %s\n' "$1" >&2
+        exit 2
+      fi
+      POS+=("$1"); shift
+      ;;
+    *) POS+=("$1"); shift ;;
+  esac
+done
+
+# Export flag-driven env overrides so sourced libs pick them up.
+[ -n "$FLAG_WORKSPACE" ] && export PLANE_WORKSPACE_SLUG="$FLAG_WORKSPACE"
+[ -n "$FLAG_API_URL" ]   && export PLANE_API_URL="$FLAG_API_URL"
+[ -n "$FLAG_CONNECT_TIMEOUT" ] && export PLANE_CONNECT_TIMEOUT="$FLAG_CONNECT_TIMEOUT"
+[ -n "$FLAG_MAX_TIME" ]        && export PLANE_MAX_TIME="$FLAG_MAX_TIME"
+[ "$FLAG_JSON" -eq 1 ]         && export PLANE_FORCE_JSON=1
+[ "$FLAG_PRETTY" -eq 1 ]       && export PLANE_FORCE_PRETTY=1
+[ "$FLAG_NO_COLOR" -eq 1 ]     && export NO_COLOR=1
+[ "$FLAG_FOLLOW" -eq 1 ]       && export PLANE_FOLLOW_REDIRECTS=1
+
+# ---- Root flags get top priority ----
+if [ "$FLAG_VERSION" -eq 1 ]; then
+  # shellcheck source=../lib/version.sh
+  . "$PLANE_LIB_DIR/version.sh"
+  _version_cmd
+  exit 0
+fi
+
+# `plane` with no args or `plane --help` or `plane help` → root help.
+if [ "$FLAG_HELP" -eq 1 ] && [ "${#POS[@]}" -eq 0 ]; then
+  _help_root
+  exit 0
+fi
+if [ "${#POS[@]}" -eq 0 ]; then
+  _help_root
+  exit 0
+fi
+
+CMD="${POS[0]}"
+POS=("${POS[@]:1}")
+
+# ---- Dispatch ----
+case "$CMD" in
+  help)
+    # `plane help` with no arg → root help. `plane help <resource>` → per-resource.
+    if [ "${#POS[@]}" -eq 0 ]; then
+      _help_root
+      exit 0
+    fi
+    _help_for "${POS[0]}"
+    exit $?
+    ;;
+  version)
+    # shellcheck source=../lib/version.sh
+    . "$PLANE_LIB_DIR/version.sh"
+    _version_cmd
     exit 0
     ;;
-  ""|-h|--help|help)
-    printf 'plane %s — not yet implemented. See Unit 4.\n' "$PLANE_VERSION"
-    exit 0
+  doctor)
+    # shellcheck source=../lib/doctor.sh
+    . "$PLANE_LIB_DIR/doctor.sh"
+    _doctor_cmd "${POS[@]:-}"
+    exit $?
+    ;;
+  resolve)
+    # shellcheck source=../lib/resolve.sh
+    . "$PLANE_LIB_DIR/resolve.sh"
+    _resolve_cmd "${POS[@]:-}"
+    exit $?
+    ;;
+  api)
+    # Escape hatch lands in Unit 7. Until then, stub out.
+    printf 'plane api: not implemented until Unit 7\n' >&2
+    exit 1
     ;;
   *)
-    printf 'plane %s: dispatcher not yet implemented (Unit 4).\n' "$PLANE_VERSION" >&2
+    # Resource dispatch: plane <resource> <action> [args]
+    RESOURCE="$CMD"
+    if [ ! -f "$PLANE_LIB_DIR/$RESOURCE.sh" ]; then
+      printf 'plane: unknown command or resource: %s\n' "$RESOURCE" >&2
+      # shellcheck disable=SC2016  # Backticks in a literal help string, not shell substitution.
+      printf 'Run `plane --help` to see available resources.\n' >&2
+      exit 2
+    fi
+
+    # Per-resource --help (no action) → load the resource lib and print its help.
+    if [ "$FLAG_HELP" -eq 1 ] && [ "${#POS[@]}" -eq 0 ]; then
+      _help_for "$RESOURCE"
+      exit $?
+    fi
+
+    if [ "${#POS[@]}" -eq 0 ]; then
+      _help_for "$RESOURCE"
+      exit $?
+    fi
+
+    ACTION="${POS[0]}"
+    POS=("${POS[@]:1}")
+
+    # Action-level --help short circuit BEFORE sourcing the action's code
+    # would be ideal, but per-action help lives inside the resource lib's
+    # stubs (Unit 6). For Unit 4 we source the resource and try to dispatch.
+    # shellcheck source=/dev/null
+    . "$PLANE_LIB_DIR/$RESOURCE.sh"
+
+    # Function name: <resource>_<action> with dashes converted to underscores.
+    safe_resource="${RESOURCE//-/_}"
+    safe_action="${ACTION//-/_}"
+    FN="_${safe_resource}_${safe_action}"
+    if declare -F "$FN" >/dev/null; then
+      "$FN" "${POS[@]:-}"
+      exit $?
+    fi
+    printf 'plane: %s %s not implemented until Unit 6\n' "$RESOURCE" "$ACTION" >&2
     exit 1
     ;;
 esac

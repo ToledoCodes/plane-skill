@@ -36,6 +36,22 @@ if [ -z "${PLANE_TEST_TMP:-}" ]; then
 fi
 mkdir -p "$PLANE_TEST_TMP"
 
+# Local informational flags never hit the network and must not be counted as
+# API calls. Behave like real curl for these: emit a version/manual line and
+# exit cleanly.
+for arg in "$@"; do
+  case "$arg" in
+    --version|-V)
+      printf 'curl 0.0.0-mock (mock_curl.sh)\n'
+      exit 0
+      ;;
+    --manual)
+      printf 'mock_curl: manual not implemented\n'
+      exit 0
+      ;;
+  esac
+done
+
 # Atomic call-counter increment (portable, no flock).
 calls_file="$PLANE_TEST_TMP/curl-calls"
 [ -f "$calls_file" ] || printf '0\n' > "$calls_file"

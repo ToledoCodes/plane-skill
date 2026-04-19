@@ -514,7 +514,7 @@ Units are dependency-ordered. Each is a candidate atomic commit.
 
 ---
 
-- [ ] **Unit 4: Dispatcher + lazy help + meta-commands (`bin/plane`, `lib/_help.sh`, `lib/doctor.sh`, `lib/version.sh`, `lib/resolve.sh`)**
+- [x] **Unit 4: Dispatcher + lazy help + meta-commands (`bin/plane`, `lib/_help.sh`, `lib/doctor.sh`, `lib/version.sh`, `lib/resolve.sh`)**
 
 **Goal:** Binary entry point routes subcommands, handles global flags, supports `--help` without sourcing resource libs, implements the three meta-commands.
 
