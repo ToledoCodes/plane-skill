@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Summary: Plane.so REST CLI dispatcher (placeholder — replaced in Unit 4).
+# Usage: plane <resource> <action> [flags]
+set -u
+
+PLANE_VERSION="0.0.0-unit1-placeholder"
+
+case "${1:-}" in
+  -v|--version|version)
+    printf 'plane %s\n' "$PLANE_VERSION"
+    exit 0
+    ;;
+  ""|-h|--help|help)
+    printf 'plane %s — not yet implemented. See Unit 4.\n' "$PLANE_VERSION"
+    exit 0
+    ;;
+  *)
+    printf 'plane %s: dispatcher not yet implemented (Unit 4).\n' "$PLANE_VERSION" >&2
+    exit 1
+    ;;
+esac

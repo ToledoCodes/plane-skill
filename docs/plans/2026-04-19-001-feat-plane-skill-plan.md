@@ -299,7 +299,7 @@ done
 
 Units are dependency-ordered. Each is a candidate atomic commit.
 
-- [ ] **Unit 0: MCP baseline measurement (premise gate — BEFORE any build)**
+- [x] **Unit 0: MCP baseline measurement (premise gate — BEFORE any build)**
 
 **Goal:** Measure actual token cost of loading `plane-mcp-server` on this machine, before writing a line of skill code. If the cost is trivially small (< 5k tokens), the skill's premise is broken and the project stops here.
 
@@ -328,7 +328,7 @@ Units are dependency-ordered. Each is a candidate atomic commit.
 
 ---
 
-- [ ] **Unit 1: Repo scaffolding, `install.sh` / `uninstall.sh`, example config**
+- [x] **Unit 1: Repo scaffolding, `install.sh` / `uninstall.sh`, example config**
 
 **Goal:** Empty repo gains its directory shape, readable README, installable/uninstallable lifecycle (bash 3.2 compatible), example config template.
 

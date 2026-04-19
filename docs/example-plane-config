@@ -1,0 +1,6 @@
+# ~/.claude/.plane — shared config for plane and plane-time-tracking skills
+# Copy this file to ~/.claude/.plane, fill in real values, and `chmod 600` it.
+# Contract: docs/contract-claude-plane.md
+workspace_slug=YOUR_WORKSPACE_SLUG
+api_url=https://your-plane-instance.example.com
+api_key_env=PLANE_API_KEY
