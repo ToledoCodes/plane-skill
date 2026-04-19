@@ -2,7 +2,7 @@
 
 A thin shell wrapper around the [Plane.so REST API](https://developers.plane.so/api-reference/introduction), packaged as an installable Claude Code skill. Agents read and write Plane resources without loading the Plane MCP server's tool schemas; discovery happens at runtime via `plane help <resource>`.
 
-**Status: v1 in progress.** The scaffolding below is real; the dispatcher and resource wrappers land in Units 4–6. See `docs/plans/2026-04-19-001-feat-plane-skill-plan.md`.
+**Status: v1 in progress.** Units 1–6 are live: scaffolding, install/uninstall, core HTTP + config + preflight, OpenAPI capture + endpoint map, dispatcher with lazy help and `doctor`/`version`/`resolve` meta-commands, and the Tier-1 resource wrappers. The generic `plane api` escape hatch (Unit 7) and the final agent-facing `SKILL.md` (Unit 8) are not yet wired. See `docs/plans/2026-04-19-001-feat-plane-skill-plan.md`.
 
 ## Why
 
@@ -10,9 +10,11 @@ The Plane MCP server loads many tool schemas at session start — in clients tha
 
 ## Scope (v1)
 
-Tier-1 hand-wrapped resources: **projects, issues, cycles, comments, time-entries, labels, states.**
+Tier-1 hand-wrapped resources: **projects, issues, cycles, comments, time-entries, labels, states.** Each exposes the common CRUD + list actions with paging, filters, and dry-run on destructive verbs. See `plane help <resource>` after install.
 
-Everything else reachable through `plane api <METHOD> <path>` — a generic escape hatch with dry-run on all non-GET methods.
+Meta-commands: `plane help [resource]`, `plane version`, `plane doctor`, `plane resolve`.
+
+Everything else *will* be reachable through `plane api <METHOD> <path>` — a generic escape hatch with dry-run on all non-GET methods. That path is stubbed in the dispatcher and lands in Unit 7.
 
 ## Requirements
 
@@ -62,22 +64,35 @@ See `docs/exit-codes.md`. Notable: **exit 7 is dry-run, not failure** — agents
 ## Layout
 
 ```
-bin/plane                # dispatcher (currently a placeholder — Unit 4 replaces)
-lib/                     # resource wrappers + shared core (Units 2, 4, 6)
+bin/plane                # dispatcher: global-flag parsing, lazy help, meta + resource routing
+lib/
+  _core.sh               # HTTP, config, preflight, retry, exit-code mapping
+  _parse.sh              # shared arg/flag parsing helpers
+  _resource.sh           # shared per-resource action plumbing
+  _endpoint_map.sh       # hand-authored path table from the captured OpenAPI spec
+  _help.sh               # grep-based lazy help (reads # Summary: headers)
+  projects.sh issues.sh cycles.sh comments.sh \
+    time-entries.sh labels.sh states.sh       # Tier-1 resource wrappers
+  doctor.sh version.sh resolve.sh             # meta-commands
+  summaries/*.jq         # per-resource jq projections for human-readable output
 docs/
   exit-codes.md
   contract-claude-plane.md
   destructive-actions.md
+  premise-validation.md
+  smoke-checklist.md
   example-plane-config
-  plans/                 # active plan + brainstorm
-test/                    # bash test runner + fixtures
+  plane-openapi-<ts>.yaml # snapshot of the upstream spec the endpoint map was built from
+  plans/                 # active plan
+  brainstorms/           # requirements brainstorm
+test/                    # bash test runner + fixtures + per-unit suites
 install.sh uninstall.sh
-SKILL.md                 # skill manifest (placeholder — Unit 8 fills in)
+SKILL.md                 # skill manifest (Unit 1 placeholder — Unit 8 replaces with agent-facing reference)
 ```
 
 ## Development
 
-Tests are plain bash with golden-file diffs. `test/run.sh` runs them all; the real runner lands in Unit 2.
+Tests are plain bash. `test/run.sh` first syntax-checks every shell file under `bin/`, `lib/`, `test/`, plus `install.sh` / `uninstall.sh`, then runs each `test/*.test.sh` in a clean subshell with a sandboxed `$PATH` whose `curl` is shimmed by `test/lib/mock_curl.sh`. Fixtures live under `test/fixtures/`.
 
 ```bash
 ./test/run.sh
