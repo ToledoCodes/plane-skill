@@ -564,7 +564,16 @@ Units are dependency-ordered. Each is a candidate atomic commit.
 
 ---
 
-- [ ] **Unit 5: Mid-build premise checkpoint (measurement against reference workflow)**
+- [~] **Unit 5: Mid-build premise checkpoint (measurement against reference workflow) — SKIPPED**
+
+Skipped 2026-04-19 by user decision. Rationale: Unit 0 measurement already
+covered the session-start premise; Unit 0 was a measurement artifact and
+the user decided mid-build re-measurement adds no new information we'd act
+on. Release-time measurement (Unit 9) still applies as the final gate.
+
+Original text preserved below for history.
+
+
 
 **Goal:** With dispatcher + meta-commands working (Unit 4) but before wrapping every T1 resource (Unit 6), confirm the premise bet still holds. Measure skill-side token cost of the portion of the reference workflow the current build supports.
 
@@ -591,7 +600,7 @@ Units are dependency-ordered. Each is a candidate atomic commit.
 
 ---
 
-- [ ] **Unit 6: Tier 1 resources — projects, issues, cycles, labels, states, comments, time-entries**
+- [x] **Unit 6: Tier 1 resources — projects, issues, cycles, labels, states, comments, time-entries**
 
 **Goal:** The 7 hand-wrapped resources get full CRUD + domain-specific actions (archive, add/remove work items from cycle, transfer-work-items, etc.), polished per-action `--help`, per-resource arg flags, summary filters, and destructive-verb classification.
 

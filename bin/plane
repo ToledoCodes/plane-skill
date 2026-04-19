@@ -44,6 +44,8 @@ fi
 . "$PLANE_LIB_DIR/_core.sh"
 # shellcheck source=../lib/_endpoint_map.sh
 . "$PLANE_LIB_DIR/_endpoint_map.sh"
+# shellcheck source=../lib/_resource.sh
+. "$PLANE_LIB_DIR/_resource.sh"
 # shellcheck source=../lib/_help.sh
 . "$PLANE_LIB_DIR/_help.sh"
 
