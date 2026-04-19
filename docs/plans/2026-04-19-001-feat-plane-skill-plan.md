@@ -388,7 +388,7 @@ Units are dependency-ordered. Each is a candidate atomic commit.
 
 ---
 
-- [ ] **Unit 2: Core HTTP + config + secret handling + preflight + test runner**
+- [x] **Unit 2: Core HTTP + config + secret handling + preflight + test runner**
 
 **Goal:** The load-bearing bash file — `lib/_core.sh` covers HTTP, config resolution, secret-via-stdin curl, retry/backoff, transport errors, TTY detection, exit-code helpers, redaction, preflight caching, and temp-file cleanup. `test/run.sh` becomes a real runner. All subsequent units build on both.
 
