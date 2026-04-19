@@ -459,7 +459,7 @@ Units are dependency-ordered. Each is a candidate atomic commit.
 
 ---
 
-- [ ] **Unit 3: Capture Plane OpenAPI spec + hand-author `lib/_endpoint_map.sh`**
+- [x] **Unit 3: Capture Plane OpenAPI spec + hand-author `lib/_endpoint_map.sh`**
 
 **Goal:** Probe `plan.toledo.codes` for an OpenAPI spec, commit the YAML as a reference artifact, then hand-author `lib/_endpoint_map.sh` covering the 7 T1 resources. No Python. No generator.
 

@@ -20,17 +20,26 @@ The escape hatch `plane api` dry-runs **all** non-GET methods (POST, PUT, PATCH,
 
 ## Placeholder table (filled in Unit 6)
 
+Cascade columns marked "TBD (not probed)" were deliberately NOT tested during
+Unit 3 — user instruction was non-destructive probing only. Unit 6 will either
+re-probe on a disposable project or classify conservatively (default to
+destructive; require `--execute`; document observed cascade post-probe).
+
+`time-entries bulk-delete` was dropped: no `bulk-*` endpoint exists in the
+Plane v1 public API (Unit 3 spec capture). Callers use repeated single calls
+or `plane api` in a loop.
+
 | Resource     | Verb                   | Destructive? | Notes |
 |--------------|------------------------|--------------|-------|
-| projects     | delete                 | TBD          | Check cascade to issues/cycles/modules |
-| projects     | archive                | TBD          | |
-| issues       | delete                 | TBD          | |
-| cycles       | delete                 | TBD          | |
-| cycles       | archive                | TBD          | |
-| cycles       | remove-work-items      | TBD          | |
-| cycles       | transfer-work-items    | TBD          | |
-| labels       | delete                 | TBD          | |
-| states       | delete                 | TBD          | |
-| comments     | delete                 | TBD          | |
-| time-entries | delete                 | TBD          | |
-| time-entries | bulk-delete            | TBD          | |
+| projects     | delete                 | Yes          | Cascade TBD (not probed); classify as destructive by default |
+| projects     | archive                | Yes          | Reversible via `unarchive` (DELETE same URL), but still removes from default views |
+| projects     | unarchive              | No           | Restore, not a mutation that loses data |
+| issues       | delete                 | Yes          | |
+| cycles       | delete                 | Yes          | |
+| cycles       | archive                | Yes          | |
+| cycles       | remove-work-item       | Yes          | Detaches an issue from a cycle (reversible via add-work-items) |
+| cycles       | transfer-work-items    | Yes          | Bulk move; significant state change even if reversible |
+| labels       | delete                 | Yes          | |
+| states       | delete                 | Yes          | |
+| comments     | delete                 | Yes          | |
+| time-entries | delete                 | Yes          | |

@@ -56,3 +56,71 @@ Plan gate: *"if MCP schema-load delta < 5k tokens, pause and reconsider the proj
 ## Raw evidence
 
 Session IDs: `26173857-5d1d-4d93-a52b-6bb37246ed2f` (Treatment-B) and prior empty/plane runs captured in shell history on 2026-04-19. Configs at `/tmp/mcp-empty.json`, `/tmp/mcp-plane-only.json`, `/tmp/empty-settings.json` during the measurement session.
+
+---
+
+## Unit 3 findings — live probes against `plan.toledo.codes`
+
+Captured 2026-04-19 against workspace `ojtech`. Only read-only GETs; no destructive verbs exercised.
+
+### OpenAPI schema
+
+- **Canonical path:** `/api/schema/` (trailing slash required; `/api/schema` 301-redirects). Probed `/api/schema/` first, hit 200 directly.
+- **Content-Type:** `application/vnd.oai.openapi; charset=utf-8` (YAML body, OpenAPI 3.0.3).
+- **Size:** 499,644 bytes, 15,843 lines, 65 unique paths, 128 operations.
+- **Committed:** `docs/plane-openapi-2026-04-19T191402Z.yaml` with a leading comment block naming the source, timestamp, and "reference only" marker.
+- **Auth scheme** (per spec and confirmed by probes): `ApiKeyAuthentication` — header `X-API-Key`. Matches prior skill and plan design.
+
+### Pagination envelope — uniform across every list endpoint probed
+
+All six T1-relevant list endpoints returned the **exact same** top-level keys:
+
+```
+grouped_by, sub_grouped_by, total_count, next_cursor, prev_cursor,
+next_page_results, prev_page_results, count, total_pages, total_results,
+extra_stats, results
+```
+
+Probed: `/projects/`, `/projects/{id}/issues/`, `/projects/{id}/labels/`, `/projects/{id}/cycles/`, `/projects/{id}/states/`, `/projects/{id}/issues/{iid}/comments/`, `/projects/{id}/time-entries/`. All 200; all identical shape.
+
+- **Pagination params (canonical, per schema):** `cursor=<str>` + `per_page=<int>` (default 20, max 100).
+- **Cursor format:** `'page_size:page_number:offset'` (e.g. `'20:1:0'`). Server-opaque from the CLI's perspective — agents pass it back verbatim.
+- **CLI mapping decision:** `--limit N` → `per_page=N`. `--cursor S` → `cursor=S`. `--all` iterates `next_cursor` until empty. `--page` explicitly rejected with a hint.
+- **Deviation from plan:** plan drafts showed `--limit` as the param name — server uses `per_page`. CLI flag stays `--limit` (user-facing ergonomics); transport layer translates.
+
+### Rate-limit headers
+
+No `X-RateLimit-*` or `Retry-After` headers observed on 2xx responses. Natural baseline — we did not force a 429 (out of scope for non-destructive probing; would hammer the sandbox). Plan's 429-retry logic consumes these headers only when Plane actually emits them, so "header may be absent on normal responses" is expected and handled (`_core_parse_retry_after` falls back to 4s).
+
+### Identifier resolution
+
+Real issue in sandbox: project `Municipal Post` / identifier `MUNI` / sequence `16` → `MUNI-16`.
+
+Both candidate paths returned **200** with identical body shape:
+
+- `GET /workspaces/ojtech/work-items/MUNI-16/` — 200 ✓ (documented path)
+- `GET /workspaces/ojtech/issues/MUNI-16/` — 200 ✓ (prior-skill path)
+
+**Decision:** use `/workspaces/<slug>/issues/<identifier>/` in `lib/resolve.sh` (Unit 4). Prior skill already uses this; both work; keep the surface consistent with prior art. If a future Plane release removes the alias, swap to `work-items/` and re-probe.
+
+Note: Plane issue objects do NOT carry the `project_identifier` short code. The CLI's `plane resolve PROJ-123` input is parsed as `<IDENTIFIER>-<SEQ>` and passed through as a URL segment; resolution happens server-side.
+
+### Destructive-verb cascades — not probed
+
+Plan calls for a `DELETE /projects/<uuid>/` probe on a throwaway project to record cascade behavior. **Skipped** per user instruction (non-destructive probing only). Consequences:
+
+- `docs/destructive-actions.md` stays at "TBD" for cascade annotations.
+- Unit 6 will either probe on a disposable project at author-time, or classify conservatively (assume cascade; require `--execute`; document behavior if probed later).
+
+### POST idempotency — not probed
+
+Same reason. Plane's POST idempotency guarantees remain unknown. Plan's conservative default (`POST/PATCH do not retry on 5xx`) is already the right call regardless; the `PLANE_RETRY_NONIDEMPOTENT=1` escape hatch exists for callers who know their payload is safe.
+
+### Path inventory captured
+
+All methods × paths for T1 resources extracted from the spec into the endpoint-map authoring notes. Notable findings:
+
+- Plane exposes **both** `/issues/` and `/work-items/` under project scope as aliases. CLI uses `issues`.
+- `POST /projects/{id}/archive/` + `DELETE /projects/{id}/archive/` — archive and unarchive share the URL.
+- **No `bulk-create` or `bulk-delete` endpoints for time-entries** in the spec. Plan Unit 6 draft mentioned them; those actions are not available in v1 of Plane's public API and will be dropped from Unit 6 scope (use repeated single calls or `plane api` loop).
+- `cycles` has first-class sub-resources: `cycle-issues` (add/remove) and `transfer-issues` — matches plan Unit 6 expectations.
